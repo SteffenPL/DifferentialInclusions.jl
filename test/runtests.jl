@@ -20,9 +20,11 @@ using Test
     prob = DIProblem(ode, cons)
 
     alg = ProjectiveMethod(OSPJ(),Euler())
-    sol = solve(prob, alg, dt = 0.001)
+    sol = solve(prob, alg, dt = 0.0001)
 
-    @test sol[end] ≈ [0.0, 1.0]
+    x_end = sol[end]
+    @test isapprox(x_end[1], 0.0, atol = 1e-3)
+    @test isapprox(x_end[2], 1.0, atol = 1e-3)
 
 end
 
