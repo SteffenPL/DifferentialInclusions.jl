@@ -4,10 +4,11 @@ module DifferentialInclusions
 
     include("DIProblem.jl")
     include("DIAlgorithm.jl")
-    include("solvers/OSPJ.jl")
+    include("solvers/splitting_methods.jl")
 
     export DIProblem
 
-    export OSPJ, ProjectiveMethod
+    export OSPJ, PSOR, PGS
+    export ProjectiveMethod
 
 end

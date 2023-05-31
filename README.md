@@ -8,5 +8,5 @@
 ## Current state:
 
 Implemented solvers for linear complementarity problems:
-- PSOR: Projected Successive Over-Relaxation with parameter ω ∈ (0, 2)
-- PGS: Projected Gauss-Seidel (ω = 1)
+- `PSOR`: Projected Successive Over-Relaxation with parameter ω ∈ (0, 2)
+- PGS: Projected Gauss-Seidel is a special case `PSOR(ω = 1)`

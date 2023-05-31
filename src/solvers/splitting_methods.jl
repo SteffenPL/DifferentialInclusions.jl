@@ -32,6 +32,8 @@ Base.@kwdef struct PSOR
     maxiter::Int64 = 10_000
 end
 
+PGS(kwargs...) = PSOR(ω = 1.0; kwargs...)
+
 struct PSORIntegrator{cT,cgT}
     cons::cT
     alg::PSOR
@@ -83,9 +85,7 @@ function (cs::PSORIntegrator)(integrator)
         iter += 1
         err = sqrt(sum(x -> x^2, λ - λ_prev))
     end
-
-    @show iter err 
-
+    
     for i in 1:m
         u[:] .+= λ[i] * dc(i)  # the gradient might not have same size as u! 
     end
