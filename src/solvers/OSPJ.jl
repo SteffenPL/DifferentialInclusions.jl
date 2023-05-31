@@ -5,20 +5,84 @@ struct OSPJIntegrator{cT}
     cons::cT
 end
 
-function (::OSPJ)(di::DIProblem) 
+function (::OSPJ)(di::DIProblem)
     return OSPJIntegrator(di.cons)
-end 
+end
 
-function projected_newton_raphson!(u, con) 
-    c = con(u) 
-    if c < 0 
+function projected_newton_raphson!(u, con)
+    c = con(u)
+    if c < 0
         dc = ForwardDiff.gradient(con, u)
         Δu = -c / dot(dc, dc) * dc
         u .+= Δu
     end
-    return nothing 
-end 
+    return nothing
+end
 
 function (cs::OSPJIntegrator)(integrator)
     foreach(con -> projected_newton_raphson!(integrator.u, con), cs.cons)
+end
+
+using DiffResults
+
+Base.@kwdef struct PSOR
+    ω::Float64 = 1.0
+    reltol::Float64 = 1e-3
+    abstol::Float64 = 1e-6
+    maxiter::Int64 = 10_000
+end
+
+struct PSORIntegrator{cT,cgT}
+    cons::cT
+    alg::PSOR
+    cons_grad::cgT
+    λ::Vector{Float64}
+    λ_prev::Vector{Float64}
+end
+
+function (alg::PSOR)(di::DIProblem)
+    m = length(di.cons)
+
+    cons_grad = [DiffResults.GradientResult(di.ode.u0) for i in 1:m]
+    return PSORIntegrator(di.cons, alg, cons_grad, zeros(m), zeros(m))
+end
+
+function (cs::PSORIntegrator)(integrator)
+    err = Inf64
+    (; cons, cons_grad, alg, λ, λ_prev) = cs
+    (; ω) = alg
+    m = length(cons)
+
+    u = integrator.u
+    du = get_du(integrator)
+    dt = integrator.dt
+
+    for (i, con) in enumerate(cons)
+        cons_grad[i] = ForwardDiff.gradient!(cons_grad[i], con, u)
+    end
+
+    λ .= zero(eltype(λ))
+    iter = 0
+
+    while ( err > cs.alg.abstol &&
+            err > cs.alg.reltol * norm(λ) &&
+            iter < cs.alg.maxiter ) 
+
+        λ_prev .= λ
+        for i in 1:m
+            
+            c = DiffResults.value(cons_grad[i])
+            dc = DiffResults.gradient(cons_grad[i])
+            λ[i] = max(0, -ω / (1 + ω) * (c + dt * dot(dc, du)) / (dt * dot(dc, dc)))
+        end
+
+        iter += 1
+        err = sqrt(sum(x -> x^2, λ - λ_prev))
+    end
+
+    for i in 1:m
+        dc = DiffResults.gradient(cons_grad[i])
+        @. u[:] += λ[i] * dc  # the gradient might not have same size as u! 
+    end
+    nothing
 end
