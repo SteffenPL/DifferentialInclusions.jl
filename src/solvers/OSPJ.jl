@@ -64,25 +64,30 @@ function (cs::PSORIntegrator)(integrator)
     λ .= zero(eltype(λ))
     iter = 0
 
+    c(i) = DiffResults.value(cons_grad[i])
+    dc(i) = DiffResults.gradient(cons_grad[i])
+
+    q(i) = c(i) + dt * dot(dc(i), du)
+    M(i) = dot(dc(i), dc(i))
+
+
     while ( err > cs.alg.abstol &&
             err > cs.alg.reltol * norm(λ) &&
             iter < cs.alg.maxiter ) 
 
         λ_prev .= λ
         for i in 1:m
-            
-            c = DiffResults.value(cons_grad[i])
-            dc = DiffResults.gradient(cons_grad[i])
-            λ[i] = max(0, -ω / (1 + ω) * (c + dt * dot(dc, du)) / (dt * dot(dc, dc)))
+            λ[i] = max(0, λ[i] - ω / M(i) * (q(i) + sum( M(j) * λ[j] for j in 1:m)) )
         end
 
         iter += 1
         err = sqrt(sum(x -> x^2, λ - λ_prev))
     end
 
+    @show iter err 
+
     for i in 1:m
-        dc = DiffResults.gradient(cons_grad[i])
-        @. u[:] += λ[i] * dc  # the gradient might not have same size as u! 
+        u[:] .+= λ[i] * dc(i)  # the gradient might not have same size as u! 
     end
     nothing
 end
