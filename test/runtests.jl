@@ -50,10 +50,11 @@ end
     end
 
     ode = ODEProblem(ode!, [0.0, 2.0], (0.0,1.0), (gamma = 10.0,))
-    prob = DIProblem(ode, cons; PenaltyMethod(1.0, 0.1))
+    
+    alg = DifferentialInclusions.PenaltyMethod(alpha = 2.0, gamma = 1e5)
+    prob = DIProblem(ode, cons, alg)
+    sol = solve(prob, Heun())
 
-    alg = Euler()
-    sol = solve(prob, alg, dt = 1e-5)
 
     x_end = sol[end]
     @test isapprox(x_end[1], 0.2, atol = 1e-3)
