@@ -23,7 +23,6 @@ function (cs::OSPJIntegrator)(integrator)
     foreach(con -> projected_newton_raphson!(integrator.u, con), cs.cons)
 end
 
-using DiffResults
 
 Base.@kwdef struct PSOR
     ω::Float64 = 1.0
@@ -70,7 +69,7 @@ function (cs::PSORIntegrator)(integrator)
     dc(i) = DiffResults.gradient(cons_grad[i])
 
     q(i) = c(i) + dt * dot(dc(i), du)
-    M(i) = dot(dc(i), dc(i))
+    M(i,j) = dot(dc(i), dc(j))
 
 
     while ( err > cs.alg.abstol &&
@@ -79,7 +78,7 @@ function (cs::PSORIntegrator)(integrator)
 
         λ_prev .= λ
         for i in 1:m
-            λ[i] = max(0, λ[i] - ω / M(i) * (q(i) + sum( M(j) * λ[j] for j in 1:m)) )
+            λ[i] = max(0, λ[i] - ω / M(i,i) * (q(i) + sum( M(j,i) * λ[j] for j in 1:m)) )
         end
 
         iter += 1
