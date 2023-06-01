@@ -1,13 +1,14 @@
-Base.@kwdef struct PenaltyMethod <: AbstractDIAlgorithm
-    alpha::Float64 = 2.0
-    gamma::Float64 = 0.1
+
+struct PenaltyMethodIntegrator{odT}
+    mod_ode::odT
 end
 
-struct PenaltyMethodIntegrator{cT,cgT,aT}
+function (alg::PenaltyMethod)(di::DIProblem)
+    return PenaltyMethodIntegrator(modify_ode(di.ode, di.cons, alg))
 end
+
 
 function modify_ode(ode, cons, alg::PenaltyMethod)
-
     # TODO this is ugly, but it works for now
     m = length(cons)
     cons_grads = [DiffResults.GradientResult(ode.u0) for i in 1:m]
@@ -29,12 +30,7 @@ end
 
 function apply!(alg::PenaltyMethod, du, u, p, t, c, dc)
     if c < 0 
-        @. du -= alg.gamma * c ^ (alg.alpha-1) * dc
+        @. du = alg.gamma * abs(c) ^ (alg.alpha-1) * dc
     end
     nothing
 end
-
-function (alg::PenaltyMethod)(di::DIProblem)
-    return PenaltyMethodIntegrator()
-end
-
