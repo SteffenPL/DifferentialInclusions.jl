@@ -1,26 +1,34 @@
 
-struct OSPJ end
+Base.@kwdef struct OSPJ
+    fwd::Bool = true
+end
 
 struct OSPJIntegrator{cT}
     cons::cT
+    alg::OSPJ
 end
 
-function (::OSPJ)(di::DIProblem)
-    return OSPJIntegrator(di.cons)
+function (alg::OSPJ)(di::DIProblem)
+    return OSPJIntegrator(di.cons, alg)
 end
 
-function projected_newton_raphson!(u, con)
-    c = con(u)
+function projected_newton_raphson!(u, idx, xi, c, dc)
     if c < 0
-        dc = ForwardDiff.gradient(con, u)
         Δu = -c / dot(dc, dc) * dc
-        u .+= Δu
+        for (i_src, i_des) in enumerate(idx)
+            u[i_des] += Δu[i_src]
+        end
     end
     return nothing
 end
 
 function (cs::OSPJIntegrator)(integrator)
-    foreach(con -> projected_newton_raphson!(integrator.u, con), cs.cons)
+    u = integrator.u
+    gds = gradients(cs.cons, u)
+    if !cs.alg.fwd
+        gds = Iterators.reverse(gds)
+    end
+    foreach(con -> projected_newton_raphson!(u, con...), gds)
 end
 
 

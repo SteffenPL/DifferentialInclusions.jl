@@ -6,6 +6,13 @@ struct ProjectiveMethod{pA, oA} <: AbstractDIAlgorithm
     ode_alg::oA 
 end
 
+
+struct PseudoSymmetricProjectiveMethod{pA, oA} <: AbstractDIAlgorithm 
+    proj_alg::pA 
+    ode_alg::oA 
+end
+
+
 Base.@kwdef struct PenaltyMethod{oA} <: AbstractDIAlgorithm
     ode_alg::oA
     alpha::Float64 = 2.0

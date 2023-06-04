@@ -93,3 +93,35 @@ end
 end
 
 
+using DifferentialInclusions: TSOnceDifferentiable, SparseConstraints
+using StaticArrays
+
+@testset "10 spheres attracted to center" begin
+
+    N = 10
+    u0 = rand(2, 10)
+    
+    cs = let 
+        R = 0.2
+        f = (u) -> sum(x -> x^2, u[:,1] - u[:,2]) - R^2
+        con = TSOnceDifferentiable(f, MMatrix{2,2}(zeros(2,2)))  
+    
+        inds = CartesianIndices(u0)
+        pairs = ((i,j) for i in 1:N for j in 1:i-1)
+        pairs_indices = SMatrix{2,2}[ [inds[:,i] inds[:,j]] for (i,j) in pairs  ]
+    
+        SparseConstraints(pairs_indices,  con)
+    end 
+    
+    ode = ODEProblem((du,u,p,t) -> (@. du = -p.gamma * (u-0.5)), u0, (0.0,2.0), (gamma = 1.0,))
+    prob = DIProblem(ode, cs)
+    alg = ProjectiveMethod(OSPJ(), Euler())
+    
+    sol_ = solve(ode, Euler(), dt = 0.001);  # 380.595 μs (8045 allocations: 1.55 MiB)
+    sol = solve(prob, alg, dt = 0.001);      # 1.757 ms (29276 allocations: 1.78 MiB)
+    
+    
+    # test if overlap is not too much (probablistic test, might fail!)
+    @test minimum( [ c for (idx,xi,c,dx) in DifferentialInclusions.gradients(cs, sol[end])] ) > -1e-3
+    
+end
