@@ -23,9 +23,6 @@ using Test
     sol = solve(prob, alg, dt = 1e-5)
 
 
-
-
-
     x_end = sol[end]
     @test isapprox(x_end[1], 0.2, atol = 1e-3)
     @test isapprox(x_end[2], 1.2, atol = 1e-3)
@@ -42,6 +39,8 @@ end
 
 @testset "Overdamped fall onto slope" begin 
 
+    using DifferentialInclusions, OrdinaryDiffEq
+
     cons = (
         u -> u[1] + u[2] - 0.0, 
         u -> u[2] + 1.0, 
@@ -51,10 +50,6 @@ end
         du[1] = 0.0
         du[2] = -p.gamma
     end
-
-    # the speed of the object is first -p.gamma 
-    # and after the contact with the slop, it will have speed -p.gamma / sqrt(2)
-    # such that the speed in each axis direction is -p.gamma / 2
 
     ode = ODEProblem( ode!, [0.0, 1.0], (0.0,2.0), (gamma = 1.0,))
     prob = DIProblem(ode, cons)
@@ -98,30 +93,33 @@ using StaticArrays
 
 @testset "10 spheres attracted to center" begin
 
-    N = 10
-    u0 = rand(2, 10)
-    
-    cs = let 
+        
+    N = 40
+    u0 = 2 * ( rand(2, N) .- 0.5 )
+
+    cs = let
         R = 0.2
         f = (u) -> sum(x -> x^2, u[:,1] - u[:,2]) - R^2
+        
         con = TSOnceDifferentiable(f, MMatrix{2,2}(zeros(2,2)))  
-    
-        inds = CartesianIndices(u0)
+        l_inds = LinearIndices(u0)
+
         pairs = ((i,j) for i in 1:N for j in 1:i-1)
-        pairs_indices = SMatrix{2,2}[ [inds[:,i] inds[:,j]] for (i,j) in pairs  ]
-    
+        pairs_indices = ( SMatrix{2,2,Int64,4}[ [l_inds[:,i] l_inds[:,j]] for (i,j) in pairs  ] )
+
         SparseConstraints(pairs_indices,  con)
     end 
-    
-    ode = ODEProblem((du,u,p,t) -> (@. du = -p.gamma * (u-0.5)), u0, (0.0,2.0), (gamma = 1.0,))
+
+
+    ode = ODEProblem((du,u,p,t) -> (@. du = -p.gamma * u), u0, (0.0,1.0), (gamma = 1.0,))
     prob = DIProblem(ode, cs)
     alg = ProjectiveMethod(OSPJ(), Euler())
-    
-    sol_ = solve(ode, Euler(), dt = 0.001);  # 380.595 μs (8045 allocations: 1.55 MiB)
-    sol = solve(prob, alg, dt = 0.001);      # 1.757 ms (29276 allocations: 1.78 MiB)
+
+    sol_ = solve(ode, Euler(), dt = 1e-4);  #  3.369 ms (40044 allocations: 22.54 MiB)
+    sol = solve(prob, alg, dt = 1e-4);      # 85.476 ms (514091 allocations: 30.74 MiB)
+
     
     
     # test if overlap is not too much (probablistic test, might fail!)
     @test minimum( [ c for (idx,xi,c,dx) in DifferentialInclusions.gradients(cs, sol[end])] ) > -1e-3
-    
 end

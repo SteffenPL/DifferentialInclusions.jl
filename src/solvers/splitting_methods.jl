@@ -24,11 +24,14 @@ end
 
 function (cs::OSPJIntegrator)(integrator)
     u = integrator.u
-    gds = gradients(cs.cons, u)
-    if !cs.alg.fwd
-        gds = Iterators.reverse(gds)
+    if cs.alg.fwd
+        gds = gradients(cs.cons, u)
+        map(con -> projected_newton_raphson!(u, con...), gds)
+        #map(con -> projected_newton_raphson!(u, con...), gds)
+    else
+        gds_r = Iterators.reverse(gradients(cs.cons, u))
+        map(con -> projected_newton_raphson!(u, con...), gds_r)
     end
-    foreach(con -> projected_newton_raphson!(u, con...), gds)
 end
 
 
@@ -86,7 +89,7 @@ function (cs::PSORIntegrator)(integrator)
 
         λ_prev .= λ
         for i in 1:m
-            λ[i] = max(0, λ[i] - ω / M(i,i) * (q(i) + sum( M(j,i) * λ[j] for j in 1:m)) )
+            λ[i] = max(0, λ[i] - ω / M(i,i) * (q(i) + sum(M(j,i) * λ[j] for j in 1:m)) )
         end
 
         iter += 1
