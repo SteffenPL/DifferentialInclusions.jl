@@ -78,6 +78,7 @@ sol_ = solve(ode, Euler(), dt = 1e-4);  #  3.369 ms (40044 allocations: 22.54 Mi
 sol = solve(prob, alg, dt = 1e-4);      # 85.476 ms (514091 allocations: 30.74 MiB)
 ```
 
-Note that the performance if the `DIProblem` is worse than the `ODEProblem` because the constraints are evaluated at each time step,
-in this case `780` pairs of spheres. Due to the sparse structure of the constraints, the performance is 
-not `780` times slower by only `30` times.
+Note that solving the `DIProblem` is, of course, slower than integrating just the `ODEProblem` because the ODE does not need to evaluate 
+the constraints at each time step.
+Thanks to the sparse constraints, the runtime is not `N * length(pairs) = 40 * 780` times slower, but instead only
+around `30` times slower. The computational effort for evaluating the constraints is around `4 * length(pairs)`.
