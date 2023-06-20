@@ -8,6 +8,8 @@ function SparseConstraints(indices, cons::Function, x; autodiff = :forward)
     return SparseConstraints(indices, df)
 end
 
+Base.length(sp::SparseConstraints) = length(sp.indices)
+
 @inline subarray(x, idx::Tuple) = SVector( (x[i] for i in idx)... )
 @inline subarray(x, idx::StaticArray) = SMatrix{size(idx)...}( (x[i] for i in idx)... )
 
@@ -25,7 +27,7 @@ function gradients(sp::SparseConstraints, x)
 end
 
 function gradients(sp::Vector, x)
-    return ( (eachindex(x), x, value!(c, x), gradient!(c, x)) for c in sp )
+    return ((eachindex(x), x, value!(c, x), gradient!(c, x)) for c in sp )
 end
 
 # this is not in-place, added for simplicity

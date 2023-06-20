@@ -1,103 +1,126 @@
 
-Base.@kwdef struct OSPJ
-    fwd::Bool = true
-end
-
-struct OSPJIntegrator{cT}
-    cons::cT
-    alg::OSPJ
-end
-
-function (alg::OSPJ)(di::DIProblem)
-    return OSPJIntegrator(di.cons, alg)
-end
-
-function projected_newton_raphson!(u, idx, xi, c, dc)
+function projected_newton_raphson!(u, idx, xi, c, dc, ω = 1.0)
     if c < 0
-        Δu = -c / dot(dc, dc) * dc
+        Δλ = -c * ω / dot(dc, dc)
         for (i_src, i_des) in enumerate(idx)
-            u[i_des] += Δu[i_src]
+            u[i_des] += Δλ * dc[i_src]
         end
     end
     return nothing
 end
 
-function (cs::OSPJIntegrator)(integrator)
-    u = integrator.u
-    if cs.alg.fwd
-        gds = gradients(cs.cons, u)
-        map(con -> projected_newton_raphson!(u, con...), gds)
-        #map(con -> projected_newton_raphson!(u, con...), gds)
-    else
-        gds_r = Iterators.reverse(gradients(cs.cons, u))
-        map(con -> projected_newton_raphson!(u, con...), gds_r)
-    end
-end
 
 
-Base.@kwdef struct PSOR
+
+Base.@kwdef struct PSOR{tO}
     ω::Float64 = 1.0
     reltol::Float64 = 1e-3
     abstol::Float64 = 1e-6
     maxiter::Int64 = 10_000
+    obs::tO = nothing
 end
 
-PGS(kwargs...) = PSOR(ω = 1.0; kwargs...)
+PSOR(kwargs...) = PSOR(ω = 1.0; kwargs...)
 
-struct PSORIntegrator{cT,cgT}
+struct PSORIntegrator{cT,uT,tO}
     cons::cT
-    alg::PSOR
-    cons_grad::cgT
-    λ::Vector{Float64}
-    λ_prev::Vector{Float64}
+    alg::PSOR{tO}
+    uprev::uT
+    u0::uT
 end
 
 function (alg::PSOR)(di::DIProblem)
-    m = length(di.cons)
-
-    cons_grad = [DiffResults.GradientResult(di.ode.u0) for i in 1:m]
-    return PSORIntegrator(di.cons, alg, cons_grad, zeros(m), zeros(m))
+    return PSORIntegrator(di.cons, alg, copy(di.ode.u0), copy(di.ode.u0))
 end
+
 
 function (cs::PSORIntegrator)(integrator)
     err = Inf64
-    (; cons, cons_grad, alg, λ, λ_prev) = cs
+    (; cons, alg, uprev, u0) = cs
     (; ω) = alg
-    m = length(cons)
 
     u = integrator.u
-    du = get_du(integrator)
-    dt = integrator.dt
 
-    for (i, con) in enumerate(cons)
-        cons_grad[i] = ForwardDiff.gradient!(cons_grad[i], con, u)
-    end
+    u0 = copy(u)
+    gds = gradients(cons, u0)
 
-    λ .= zero(eltype(λ))
     iter = 0
-
-    c(i) = DiffResults.value(cons_grad[i])
-    dc(i) = DiffResults.gradient(cons_grad[i])
-
-    q(i) = c(i) + dt * dot(dc(i), du)
-    M(i,j) = dot(dc(i), dc(j))
-
-
     while ( err > cs.alg.abstol &&
-            err > cs.alg.reltol * norm(λ) &&
+            err > cs.alg.reltol * norm(uprev) / length(uprev) &&
             iter < cs.alg.maxiter ) 
 
-        λ_prev .= λ
-        for i in 1:m
-            λ[i] = max(0, λ[i] - ω / M(i,i) * (q(i) + sum(M(j,i) * λ[j] for j in 1:m)) )
-        end
+        uprev .= u
+        map(con -> projected_newton_raphson!(u, con..., ω), gds)
 
         iter += 1
-        err = sqrt(sum(x -> x^2, λ - λ_prev))
+
+        err = 0.0 
+        for i in eachindex(u)
+            err += (u[i] - uprev[i])^2
+        end
+        err = sqrt(err) / length(u)
     end
     
-    for i in 1:m
-        u[:] .+= λ[i] * dc(i)  # the gradient might not have same size as u! 
-    end
+    update_obs!(alg.obs, integrator, iter)
     nothing
 end
+
+
+
+Base.@kwdef struct PNGS{tO}
+    ω::Float64 = 1.0
+    reltol::Float64 = 1e-3
+    abstol::Float64 = 1e-6
+    maxiter::Int64 = 10_000
+    obs::tO = nothing
+end
+
+PNGS(kwargs...) = PNGS(ω = 1.0; kwargs...)
+
+struct PNGSIntegrator{cT,uT,tO}
+    cons::cT
+    alg::PNGS{tO}
+    uprev::uT
+end
+
+function (alg::PNGS)(di::DIProblem)
+    return PNGSIntegrator(di.cons, alg, copy(di.ode.u0))
+end
+
+
+update_obs!(obs, int, iters) = nothing
+update_obs!(obs::Vector{Int64}, int, iters) = push!(obs, iters)
+
+function (cs::PNGSIntegrator)(integrator)
+    err = Inf64
+    (; cons, alg, uprev) = cs
+    (; ω) = alg
+
+    u = integrator.u
+
+    iter = 0
+    while ( err > cs.alg.abstol &&
+            err > cs.alg.reltol * norm(uprev) / length(uprev) &&
+            iter < cs.alg.maxiter ) 
+
+        uprev .= u
+
+        gds = gradients(cons, u)
+        map(con -> projected_newton_raphson!(u, con..., ω), gds)
+
+        iter += 1
+
+        err = 0.0 
+        for i in eachindex(u)
+            err += (u[i] - uprev[i])^2
+        end
+        err = sqrt(err) / length(u)
+    end
+    
+    update_obs!(alg.obs, integrator, iter)
+    nothing
+end
+
+
+PBD(;kwargs...) = PNGS(; ω = 1.0, maxiter = 1, kwargs...)
+PGS(;kwargs...) = PSOR(; ω = 1.0, kwargs...)

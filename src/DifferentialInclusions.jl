@@ -12,7 +12,7 @@ module DifferentialInclusions
 
     export DIProblem
 
-    export OSPJ, PSOR, PGS, PenaltyMethod
+    export PBD, PSOR, PGS, PNGS, PenaltyMethod
     export ProjectiveMethod
 
 end

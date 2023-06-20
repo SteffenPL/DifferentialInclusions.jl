@@ -19,7 +19,7 @@ using Test
     ode = ODEProblem(ode!, [0.0, 2.0], (0.0,1.0), (gamma = 10.0,))
     prob = DIProblem(ode, cons)
 
-    alg = ProjectiveMethod(OSPJ(),Euler())
+    alg = ProjectiveMethod(PBD(),Euler())
     sol = solve(prob, alg, dt = 1e-5)
 
 
@@ -113,7 +113,7 @@ using StaticArrays
 
     ode = ODEProblem((du,u,p,t) -> (@. du = -p.gamma * u), u0, (0.0,1.0), (gamma = 1.0,))
     prob = DIProblem(ode, cs)
-    alg = ProjectiveMethod(OSPJ(), Euler())
+    alg = ProjectiveMethod(PBD(), Euler())
 
     sol_ = solve(ode, Euler(), dt = 1e-4);  #  3.369 ms (40044 allocations: 22.54 MiB)
     sol = solve(prob, alg, dt = 1e-4);      # 85.476 ms (514091 allocations: 30.74 MiB)
