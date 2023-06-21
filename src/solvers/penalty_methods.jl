@@ -24,7 +24,10 @@ function modify_ode(ode, cons, alg::PenaltyMethod)
         end
         return nothing
     end
-    ode_mod = remake(ode, f = ode_mod)
+
+    f_ode = ODEFunction(ode_mod, analytic = ode.f.analytic)
+
+    ode_mod = remake(ode, f = f_ode)
     return ode_mod
 end
 

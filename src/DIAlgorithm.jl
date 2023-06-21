@@ -27,15 +27,25 @@ function SciMLBase.solve(di::DIProblem, alg; kwargs...)
 end
 
 function SciMLBase.solve(di::DIProblem, alg::ProjectiveMethod; kwargs...)
+    return solve(get_ode(di, alg)...; save_everystep = false, kwargs...)
+end
+
+
+function get_ode(di::DIProblem, alg::ProjectiveMethod; kwarfs...)
     each_step(u, t, integrator) = true 
     non_smooth_int = alg.proj_alg(di)
     cb = DiscreteCallback(each_step, non_smooth_int; save_positions = (false, true))
 
-    return solve(di.ode, alg.ode_alg; save_everystep = false, callback = cb, kwargs...)
+    prob = remake(di.ode, callback = cb)
+    return prob, alg.ode_alg
+end
+
+function SciMLBase.solve(di::DIProblem, alg::PenaltyMethod; kwargs...)
+    return solve(get_ode(di, alg)...; kwargs...)
 end
 
 
-function SciMLBase.solve(di::DIProblem, alg::PenaltyMethod; kwargs...)
+function get_ode(di::DIProblem, alg::PenaltyMethod; kwarfs...)
     di_int = alg(di) 
-    return solve(di_int.mod_ode, alg.ode_alg; kwargs...)
+    return di_int.mod_ode, alg.ode_alg
 end

@@ -13,17 +13,17 @@ Base.length(sp::SparseConstraints) = length(sp.indices)
 @inline subarray(x, idx::Tuple) = SVector( (x[i] for i in idx)... )
 @inline subarray(x, idx::StaticArray) = SMatrix{size(idx)...}( (x[i] for i in idx)... )
 
-function gradients(sp, x, idx)
+function gradients(sp, x, idx, compute_all)
     xi = subarray(x, idx)
     c = value!(sp.cons, xi)
-    if c < 0 
+    if compute_all || c < 0 
         gradient!(sp.cons, xi)
     end
     return (idx, xi, value(sp.cons), gradient(sp.cons))
 end
 
-function gradients(sp::SparseConstraints, x)
-    return (gradients(sp, x, idx) for idx in sp.indices)
+function gradients(sp::SparseConstraints, x, compute_all = false)
+    return (gradients(sp, x, idx, compute_all) for idx in sp.indices)
 end
 
 function gradients(sp::Vector, x)
@@ -36,7 +36,7 @@ function _gradient!(dr, f, x)
     return (DiffResults.value(dr), DiffResults.gradient(dr))
 end
 
-function gradients(sp, x)
+function gradients(sp, x, compute_all = false)
     dr = DiffResults.GradientResult(x)
     return ((eachindex(x), x, _gradient!(dr, c, x)...) for c in sp)
 end
