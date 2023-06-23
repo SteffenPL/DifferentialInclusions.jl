@@ -38,7 +38,7 @@ end
 ode = ODEProblem( ode!, [0.0, 2.0], (0.0,1.0), (gamma = 1.0,))
 prob = DIProblem(ode, cons)
 
-alg = ProjectiveMethod(OSPJ(),Euler())
+alg = ProjectiveMethod(PBD(),Euler())
 sol = solve(prob, alg, dt = 0.001)
 
 
